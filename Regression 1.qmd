@@ -1,0 +1,195 @@
+---
+title: "New Regression"
+author: "Nam Tran"
+format: docx
+editor: visual
+---
+
+Packages used
+
+```{r}
+pacman::p_load(tidyverse, 
+               magrittr,
+               skimr,
+               psych,
+               broom)
+options(scipen = 999)
+```
+
+# Data Preparation 
+
+Import the full data to the working environment
+
+```{r}
+full_data <- read.csv('full_data.csv', stringsAsFactors = T)
+```
+
+Convert PERMNO to factor and format the date column
+
+```{r}
+full_data %<>%
+  select(-X) %>% 
+  mutate(PERMNO = as.factor(PERMNO),
+         date = ymd(date)
+         )
+```
+
+# Period 1 
+
+Extract data for the first period only
+
+```{r}
+
+sample_1 <- full_data %>% 
+            filter(year %in% c(2016, 2017, 2018)) %>% 
+            select(everything())
+```
+
+# Customization Function 
+
+## 1. Model Execution 
+
+```{r}
+
+model_execution <- function(data){
+    # Create an empty data frame to store the results
+  results <- data.frame(PERMNO = character(),
+                        Reg1_B1 = numeric(),
+                        Reg1_P1 = numeric(),
+                        Reg1_ARS = numeric(),
+                        stringsAsFactors = T)
+  
+  # Loop through all unique company names
+  for (company in unique(data[,'PERMNO'])) {
+    # Filter the data for the current company
+    company_data <- data %>%
+      filter(PERMNO == company)
+  
+    # Create a linear regression model with the constraint on the intercept
+    model <- lm(excess_ret ~ 0 + market_prem, 
+                data = company_data)
+  
+    # Extract the coefficient values, p-values, and adjusted R-squared
+    coefficient <- coef(model)["market_prem"]
+    p_value <- summary(model)$coefficients["market_prem", 
+                                           "Pr(>|t|)"]
+    adjusted_r_squared <- summary(model)$adj.r.squared
+  
+    # Store the extracted values in the results data frame
+    results <- rbind(results, 
+                     data.frame(PERMNO = company,
+                                Reg1_B1 = coefficient,
+                                Reg1_P1 = p_value,
+                                Reg1_ARS = adjusted_r_squared,
+                                stringsAsFactors = T))
+    rownames(results) <- NULL
+    
+    # Round output to 4 decimal places
+    results %<>% 
+      mutate_if(is.numeric, round, digits = 4)
+  }
+  return(results)
+
+}
+
+```
+
+## 2. Statistical summary
+
+```{r}
+statistic_summary <- function(data){
+
+  train_1 %>% 
+    select(-PERMNO) %>% 
+    describe() %>% 
+    select(mean, sd, skew, kurtosis)
+}  
+```
+
+## 3. Visualization 
+
+```{r}
+histogram_viz <- function(input, variable, binwdith = 0.05, time){
+  input %>%
+  ggplot(aes_string(x = variable)) +
+  geom_histogram(binwidth = binwdith, fill = "#5DADE2", color = "#2C3E50", alpha = 0.8) +
+  labs(title = paste("Distribution of", variable, time),
+       x = variable,
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"),
+        axis.text = element_text(size = 8))
+}
+```
+
+## Model 1: Stock's Excess Return \~ Unadjusted Market Return 
+
+### 1. Model's Execution
+
+```{r}
+train_1 <- model_execution(sample_1)
+
+# Sample Result
+train_1 %>% head()
+```
+
+### 2. Statistical Summary
+
+```{r}
+
+train_1_summary <- statistic_summary(train_1)
+
+```
+
+### 3. Visualization
+
+```{r}
+histogram_viz(train_1, 
+              variable = 'Reg1_B1',
+              time = 'from 2016 to 2018')
+```
+
+```{r}
+histogram_viz(train_1, variable = 'Reg1_ARS', 
+              binwdith = 0.015,
+              time = 'from 2016 to 2018')
+```
+
+# Period 2
+
+Change the sub sample dataset
+
+```{r}
+
+sample_2 <- anti_join(full_data, sample_1, by = 'date')
+```
+
+## Model 1: Stock's Excess return \~ Market Premium 
+
+### 1. Model's Execution
+
+```{r}
+validation_1 <- model_execution(sample_2)
+```
+
+### 2. Statistical Summary
+
+```{r}
+valid_1_summary <- statistic_summary(validation_1)
+```
+
+### 3. Visualization
+
+```{r}
+histogram_viz(validation_1, 
+              variable = 'Reg1_B1', 
+              time = 'From 2019 to 2021')
+```
+
+```{r}
+histogram_viz(validation_1, 'Reg1_ARS', 
+              binwdith = 0.015,
+              'From 2019 to 2021')
+```
