@@ -1,11 +1,11 @@
 ---
-title: "Regression 1"
+title: "Regression 2"
 author: "Nam Tran"
 format: docx
 editor: visual
 ---
 
-Packages used
+Packages used:
 
 ```{r}
 pacman::p_load(tidyverse, 
@@ -16,19 +16,19 @@ pacman::p_load(tidyverse,
 options(scipen = 999)
 ```
 
-# Data Preparation
+## Data Preparation
 
 Import the full data to the working environment
 
 ```{r}
-full_data <- read.csv('full_data.csv', stringsAsFactors = T)
+full_data <- read.csv('reg2_data.csv', stringsAsFactors = T)
 ```
 
 Convert PERMNO to factor and format the date column
 
 ```{r}
 full_data %<>%
-  select(-X) %>% 
+  select(-c(X, year)) %>% 
   mutate(PERMNO = as.factor(PERMNO),
          date = ymd(date)
          )
@@ -41,22 +41,23 @@ Extract data for the first period only
 ```{r}
 
 sample_1 <- full_data %>% 
-            filter(year %in% c(2016, 2017, 2018)) %>% 
+            filter(year(date) %in% c(2016, 2017, 2018)) %>% 
             select(everything())
 ```
 
+# Customization Function
 
-
-## 1. Model Execution
+### 1. Model Execution
 
 ```{r}
-
 model_execution <- function(data){
     # Create an empty data frame to store the results
   results <- data.frame(PERMNO = character(),
-                        Reg1_B1 = numeric(),
-                        Reg1_P1 = numeric(),
-                        Reg1_ARS = numeric(),
+                        Reg2_B1 = numeric(),
+                        Reg2_B2 = numeric(),
+                        Reg2_P1 = numeric(),
+                        Reg2_P2 = numeric(),
+                        Reg2_ARS = numeric(),
                         stringsAsFactors = T)
   
   # Loop through all unique company names
@@ -66,21 +67,22 @@ model_execution <- function(data){
       filter(PERMNO == company)
   
     # Create a linear regression model with the constraint on the intercept
-    model <- lm(excess_ret ~ 0 + market_prem, 
+    model <- lm(excess_ret ~ 0 + mket_prem + sector_prem, 
                 data = company_data)
   
     # Extract the coefficient values, p-values, and adjusted R-squared
-    coefficient <- coef(model)["market_prem"]
-    p_value <- summary(model)$coefficients["market_prem", 
-                                           "Pr(>|t|)"]
+    coefficients <- coef(model)[c("mket_prem", "sector_prem")]
+    p_values <- summary(model)$coefficients[c("mket_prem", "sector_prem"), "Pr(>|t|)"]
     adjusted_r_squared <- summary(model)$adj.r.squared
   
     # Store the extracted values in the results data frame
     results <- rbind(results, 
                      data.frame(PERMNO = company,
-                                Reg1_B1 = coefficient,
-                                Reg1_P1 = p_value,
-                                Reg1_ARS = adjusted_r_squared,
+                                Reg2_B1 = coefficients["mket_prem"],
+                                Reg2_B2 = coefficients["sector_prem"],
+                                Reg2_P1 = p_values["mket_prem"],
+                                Reg2_P2 = p_values["sector_prem"],
+                                Reg2_ARS = adjusted_r_squared,
                                 stringsAsFactors = T))
     rownames(results) <- NULL
     
@@ -91,10 +93,9 @@ model_execution <- function(data){
   return(results)
 
 }
-
 ```
 
-## 2. Statistical summary
+### 2. Statistical Summary
 
 ```{r}
 statistic_summary <- function(data){
@@ -105,9 +106,34 @@ statistic_summary <- function(data){
 }  
 ```
 
-## 3. Visualization
+### 3. Visualization
+
+3.  1 Coefficients
 
 ```{r}
+
+density_viz <- function(input, time){
+  input %>% 
+    select(PERMNO, Reg2_B1, Reg2_B2) %>% 
+    gather(key = 'Variable',
+           value = 'Coefficient',
+           -PERMNO) %>% 
+    ggplot(aes(x = Coefficient, fill = Variable)) + 
+    geom_density(alpha = 0.5) + 
+    labs(title = paste('Density plot of Reg2_B1 and Reg2_B2', time),
+         x = "Coefficient",
+         y = "Density",
+         fill = "Variable") + 
+    ylim(c(0,1.15)) + 
+    theme_minimal()
+}
+
+```
+
+3.  2 Adjusted R-Squared
+
+```{r}
+
 histogram_viz <- function(input, variable, binwdith = 0.05, time){
   input %>%
   ggplot(aes_string(x = variable)) +
@@ -121,73 +147,78 @@ histogram_viz <- function(input, variable, binwdith = 0.05, time){
         axis.title.y = element_text(size = 10, face = "bold"),
         axis.text = element_text(size = 8))
 }
+
 ```
 
-## Model 1: Stock's Excess Return \~ Unadjusted Market Return
+## Model 2: Stock's Excess Return \~ Unadjusted Market Return + Unadjusted Sector Return
 
 ### 1. Model's Execution
 
 ```{r}
 train_1 <- model_execution(sample_1)
-
 ```
 
 ### 2. Statistical Summary
 
 ```{r}
-
-train_1_summary <- statistic_summary(train_1)
-
+train_1 %>% 
+  statistic_summary()
 ```
 
 ### 3. Visualization
 
-```{r}
-histogram_viz(train_1, 
-              variable = 'Reg1_B1',
-              time = 'from 2016 to 2018')
-```
+3.1 Coefficient Viz
 
 ```{r}
-histogram_viz(train_1, variable = 'Reg1_ARS', 
-              binwdith = 0.015,
-              time = 'from 2016 to 2018')
+density_viz(train_1, "From 2016 to 2018")
+```
+
+3.2 Adjusted R-Squared
+
+```{r}
+histogram_viz(train_1, 
+              variable = 'Reg2_ARS',
+              time = 'From 2016 to 2018', 
+              binwdith = 0.03)
 ```
 
 # Period 2
 
-Change the sub sample dataset
+Extract data for period 2
 
 ```{r}
-
 sample_2 <- full_data %>% 
   filter(year(date) %in% c(2019, 2020, 2021))
 ```
 
-## Model 1: Stock's Excess return \~ Market Premium
+## Model 2: Stock's Excess Return \~ Unadjusted Market Return + Unadjusted Sector Return
 
 ### 1. Model's Execution
 
 ```{r}
-validation_1 <- model_execution(sample_2)
+train_2 <- model_execution(sample_2)
 ```
 
 ### 2. Statistical Summary
 
 ```{r}
-valid_1_summary <- statistic_summary(validation_1)
+train_2 %>% 
+  statistic_summary()
 ```
 
 ### 3. Visualization
 
-```{r}
-histogram_viz(validation_1, 
-              variable = 'Reg1_B1', 
-              time = 'From 2019 to 2021')
-```
+3.1 Coefficient viz
 
 ```{r}
-histogram_viz(validation_1, 'Reg1_ARS', 
-              binwdith = 0.015,
-              'From 2019 to 2021')
+density_viz(train_2, 'From 2019 to 2021')
+```
+
+3.2 Adjusted R squared
+
+```{r}
+histogram_viz(train_2, 
+              variable = 'Reg2_ARS',
+              time = 'From 2019 to 2021', 
+              binwdith = 0.03)
 ```
