@@ -1,9 +1,10 @@
 ---
-title: "Regression 1"
+title: "Regression 4"
 author: "Nam Tran"
 format: docx
 editor: visual
 ---
+
 
 Packages used
 
@@ -16,80 +17,97 @@ pacman::p_load(tidyverse,
 options(scipen = 999)
 ```
 
+
 # Data Preparation
 
-Import the full data to the working environment
-
 ```{r}
-full_data <- read.csv('full_data.csv', stringsAsFactors = T)
-```
+full_data <- read.csv('reg2_data.csv', stringsAsFactors = T)
 
-Convert PERMNO to factor and format the date column
-
-```{r}
 full_data %<>%
-  select(-X) %>% 
+  select(-c(X, year)) %>% 
   mutate(PERMNO = as.factor(PERMNO),
          date = ymd(date)
          )
 ```
 
-# Period 1
+Create an adjusted market premium column 
 
-## Function Customization
+```{r}
+
+# Calculate the total market cap of all stocks for each date
+full_data %<>%
+  group_by(date) %>%
+  mutate(Total_Market_Cap = sum(MKT_CAP, na.rm = TRUE)) %>%
+  ungroup()
+
+# Calculate the adjusted market return for each stock
+full_data %<>%
+  group_by(date, PERMNO) %>%
+  mutate(Adjusted_Market_Cap = Total_Market_Cap - MKT_CAP) %>%
+  ungroup()
+
+# Calculate the adjusted market return column
+full_data %<>%
+  mutate(
+    Adjusted_Market_Return = 
+      (mkret * Total_Market_Cap - ind_ret * MKT_CAP) / Adjusted_Market_Cap)
+
+
+# Calculate the adjusted market return premium
+
+full_data %<>%
+  mutate(Adj_Market_Ret_Prem = Adjusted_Market_Return - EFFR)
+```
+
+# Period 1
 
 Extract data for the first period only
 
 ```{r}
 
 sample_1 <- full_data %>% 
-            filter(year %in% c(2016, 2017, 2018)) %>% 
-            select(everything())
+            filter(year(date) %in% c(2016, 2017, 2018)) %>% 
+            select(date, PERMNO, excess_ret, Adj_Market_Ret_Prem)
 ```
+
+## Function Customization
 
 ### 1. Model Execution
 
 ```{r}
-
-model_execution <- function(data){
-    # Create an empty data frame to store the results
+model_execution <- function(input){
+  # Create an empty data frame to store the results
   results <- data.frame(PERMNO = character(),
-                        Reg1_B1 = numeric(),
-                        Reg1_P1 = numeric(),
-                        Reg1_ARS = numeric(),
-                        stringsAsFactors = T)
+                        Reg4_B1 = numeric(),
+                        Reg4_P1 = numeric(),
+                        Reg4_ARS = numeric())
   
   # Loop through all unique company names
-  for (company in unique(data[,'PERMNO'])) {
+  for (company in unique(input$PERMNO)) {
     # Filter the data for the current company
-    company_data <- data %>%
-      filter(PERMNO == company)
+    company_data <- input[input$PERMNO == company, ]
   
     # Create a linear regression model with the constraint on the intercept
-    model <- lm(excess_ret ~ 0 + market_prem, 
+    model <- lm(excess_ret ~ 0 + Adj_Market_Ret_Prem, 
                 data = company_data)
   
     # Extract the coefficient values, p-values, and adjusted R-squared
-    coefficient <- coef(model)["market_prem"]
-    p_value <- summary(model)$coefficients["market_prem", 
-                                           "Pr(>|t|)"]
+    coefficient <- as.numeric(coef(model)["Adj_Market_Ret_Prem"])
+    p_value <- summary(model)$coefficients["Adj_Market_Ret_Prem", "Pr(>|t|)"]
     adjusted_r_squared <- summary(model)$adj.r.squared
   
     # Store the extracted values in the results data frame
-    results <- rbind(results, 
+    results <- rbind(results,
                      data.frame(PERMNO = company,
-                                Reg1_B1 = coefficient,
-                                Reg1_P1 = p_value,
-                                Reg1_ARS = adjusted_r_squared,
-                                stringsAsFactors = T))
-    rownames(results) <- NULL
+                                Reg4_B1 = coefficient,
+                                Reg4_P1 = p_value,
+                                Reg4_ARS = adjusted_r_squared))
     
     # Round output to 4 decimal places
     results %<>% 
       mutate_if(is.numeric, round, digits = 4)
   }
   return(results)
-
 }
 
 ```
@@ -97,8 +115,8 @@ model_execution <- function(data){
 ### 2. Statistical summary
 
 ```{r}
-statistic_summary <- function(data){
-  data %>% 
+statistic_summary <- function(input){
+  input %>% 
     select(-PERMNO) %>% 
     describe() %>% 
     select(mean, sd, skew, kurtosis)
@@ -123,13 +141,13 @@ histogram_viz <- function(input, variable, binwdith = 0.05, time){
 }
 ```
 
-## Model 1: Stock's Excess Return \~ Unadjusted Market Return
+## Model 4: Stock's Excess Return \~ adjusted Market Return
 
 ### 1. Model's Execution
 
 ```{r}
-train_1 <- model_execution(sample_1)
 
+train_1 <- model_execution(sample_1)
 ```
 
 ### 2. Statistical Summary
@@ -142,52 +160,56 @@ train_1_summary <- statistic_summary(train_1)
 
 ### 3. Visualization
 
+3.1 Coefficient
 ```{r}
 histogram_viz(train_1, 
-              variable = 'Reg1_B1',
+              variable = 'Reg4_B1',
               time = 'from 2016 to 2018')
 ```
 
+3.2 Adjusted R squared
 ```{r}
-histogram_viz(train_1, variable = 'Reg1_ARS', 
+histogram_viz(train_1, variable = 'Reg4_ARS', 
               binwdith = 0.015,
               time = 'from 2016 to 2018')
 ```
-
 # Period 2
-
 Change the sub sample dataset
 
 ```{r}
 
 sample_2 <- full_data %>% 
-  filter(year(date) %in% c(2019, 2020, 2021))
+  filter(year(date) %in% c(2019, 2020, 2021)) %>% 
+  select(date, PERMNO, excess_ret, Adj_Market_Ret_Prem)
 ```
 
-## Model 1: Stock's Excess return \~ Market Premium
+## Model 1: Stock's Excess return \~ Adjusted Market Premium
 
 ### 1. Model's Execution
 
 ```{r}
-validation_1 <- model_execution(sample_2)
+train_2 <- model_execution(sample_2)
 ```
 
 ### 2. Statistical Summary
 
 ```{r}
-valid_1_summary <- statistic_summary(validation_1)
+train_2_summary <- statistic_summary(train_2)
 ```
 
 ### 3. Visualization
 
 ```{r}
-histogram_viz(validation_1, 
-              variable = 'Reg1_B1', 
+histogram_viz(train_2, 
+              variable = 'Reg4_B1', 
               time = 'From 2019 to 2021')
 ```
 
 ```{r}
-histogram_viz(validation_1, 'Reg1_ARS', 
+histogram_viz(train_2, 'Reg4_ARS', 
               binwdith = 0.015,
               'From 2019 to 2021')
 ```
+
+
+
