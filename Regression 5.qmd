@@ -1,0 +1,291 @@
+---
+title: "Regression 5"
+author: "Nam Tran"
+format: docx
+editor: visual
+---
+
+
+Packages used
+
+```{r}
+pacman::p_load(tidyverse, 
+               magrittr,
+               skimr,
+               psych,
+               broom)
+options(scipen = 999)
+```
+
+# Data Preparation
+
+```{r}
+full_data <- read.csv('reg2_data.csv', stringsAsFactors = T)
+
+full_data %<>%
+  select(-c(X, year)) %>% 
+  mutate(PERMNO = as.factor(PERMNO),
+         date = ymd(date)
+         )
+```
+
+1. Create an adjusted market premium column
+
+```{r}
+
+# Calculate the total market cap of all stocks for each date
+full_data %<>%
+  group_by(date) %>%
+  mutate(Total_Market_Cap = sum(MKT_CAP)) %>%
+  ungroup()
+
+# Calculate the adjusted market return for each stock
+full_data %<>%
+  group_by(date, PERMNO) %>%
+  mutate(Adjusted_Market_Cap = Total_Market_Cap - MKT_CAP) %>%
+  ungroup()
+
+# Calculate the adjusted market return column
+full_data %<>%
+  mutate(
+    Adjusted_Market_Return = 
+      (mkret * Total_Market_Cap - ind_ret * MKT_CAP) / Adjusted_Market_Cap)
+
+
+# Calculate the adjusted market return premium
+
+full_data %<>%
+  mutate(Adj_Market_Ret_Prem = Adjusted_Market_Return - EFFR)
+```
+
+2. Create adjusted sector premium column 
+
+```{r}
+
+# Calculate the total market cap of all stocks in a sector for each date
+full_data %<>%
+  group_by(date, Sector) %>%
+  mutate(Total_Sector_Market_Cap = sum(MKT_CAP)) %>%
+  ungroup()
+
+# Calculate the unadjusted daily sector return 
+
+full_data %<>%
+  group_by(date, Sector) %>%
+  mutate(sector_ret = sum(ind_ret*MKT_CAP)/Total_Sector_Market_Cap) %>%
+  ungroup()
+
+
+# Calculate the adjusted sector market cap 
+
+full_data %<>% 
+  mutate(Adjusted_Sector_Market_Cap = Total_Sector_Market_Cap - MKT_CAP)
+
+
+# Calculate the adjusted market return column
+full_data %<>%
+  mutate(
+    Adjusted_Sector_Return = 
+      (sector_ret * Total_Sector_Market_Cap - ind_ret * MKT_CAP) / Adjusted_Sector_Market_Cap)
+
+
+# Calculate the adjusted market return premium
+
+full_data %<>%
+  mutate(Adj_Sector_Ret_Prem = Adjusted_Sector_Return - EFFR)
+
+```
+
+
+## Function Customization
+
+### 1. Model Execution
+
+```{r}
+model_execution <- function(data){
+    # Create an empty data frame to store the results
+  results <- data.frame(PERMNO = character(),
+                        Reg5_B1 = numeric(),
+                        Reg5_B2 = numeric(),
+                        Reg5_P1 = numeric(),
+                        Reg5_P2 = numeric(),
+                        Reg5_ARS = numeric(),
+                        stringsAsFactors = T)
+  
+  # Loop through all unique company names
+  for (company in unique(data$PERMNO)) {
+    # Filter the data for the current company
+    company_data <- data[data$PERMNO == company,]
+    # Create a linear regression model with the constraint on the intercept
+    model <- lm(excess_ret ~ 0 + Adj_Market_Ret_Prem + Adj_Sector_Ret_Prem, 
+                data = company_data)
+  
+    # Extract the coefficient values, p-values, and adjusted R-squared
+    coefficients <- coef(model)[c("Adj_Market_Ret_Prem", "Adj_Sector_Ret_Prem")]
+    p_values <- summary(model)$coefficients[c("Adj_Market_Ret_Prem", "Adj_Sector_Ret_Prem"), "Pr(>|t|)"]
+    adjusted_r_squared <- summary(model)$adj.r.squared
+  
+    # Store the extracted values in the results data frame
+    results <- rbind(results, 
+                     data.frame(PERMNO = company,
+                                Reg5_B1 = coefficients["Adj_Market_Ret_Prem"],
+                                Reg5_B2 = coefficients["Adj_Sector_Ret_Prem"],
+                                Reg5_P1 = p_values["Adj_Market_Ret_Prem"],
+                                Reg5_P2 = p_values["Adj_Sector_Ret_Prem"],
+                                Reg5_ARS = adjusted_r_squared,
+                                stringsAsFactors = T))
+    rownames(results) <- NULL
+    
+    # Round output to 4 decimal places
+    results %<>% 
+      mutate_if(is.numeric, round, digits = 4)
+  }
+  return(results)
+
+}
+
+```
+
+
+### 2. Statistical Summary
+
+```{r}
+statistic_summary <- function(data){
+  data %>% 
+    select(-PERMNO) %>% 
+    describe() %>% 
+    select(mean, sd, skew, kurtosis)
+}  
+```
+
+### 3. Visualization
+
+3.  1 Coefficients
+
+```{r}
+
+density_viz <- function(input, time){
+  input %>% 
+    select(PERMNO, Reg5_B1, Reg5_B2) %>% 
+    gather(key = 'Variable',
+           value = 'Coefficient',
+           -PERMNO) %>% 
+    ggplot(aes(x = Coefficient, fill = Variable)) + 
+    geom_density(alpha = 0.5) + 
+    labs(title = paste('Density plot of Reg5_B1 and Reg5_B2', time),
+         x = "Coefficient",
+         y = "Density",
+         fill = "Variable") + 
+    ylim(c(0,1.15)) + 
+    theme_minimal()
+}
+
+```
+
+3.  2 Adjusted R-Squared
+
+```{r}
+
+histogram_viz <- function(input, variable, binwdith = 0.05, time){
+  input %>%
+  ggplot(aes_string(x = variable)) +
+  geom_histogram(binwidth = binwdith, fill = "#5DADE2", color = "#2C3E50", alpha = 0.8) +
+  labs(title = paste("Distribution of", variable, time),
+       x = variable,
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
+        axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"),
+        axis.text = element_text(size = 8))
+}
+
+```
+
+# Period 1
+
+Extract data for the first period only
+
+```{r}
+
+sample_1 <- full_data %>% 
+            filter(year(date) %in% c(2016, 2017, 2018)) %>% 
+            select(date, 
+                   PERMNO, 
+                   excess_ret,
+                   Adj_Market_Ret_Prem, 
+                   Adj_Sector_Ret_Prem)
+```
+
+## Model 5: Excess Return ~ Adjusted Market Returns + Adjusted Sector Returns
+
+### 1. Model's Execution
+
+```{r}
+train_1 <- model_execution(sample_1)
+```
+
+### 2. Statistical Summary
+
+```{r}
+train_1 %>% 
+  statistic_summary()
+```
+
+
+### 3. Visualization
+
+3.1 Coefficient Viz
+
+```{r}
+density_viz(train_1, "From 2016 to 2018")
+```
+
+
+3.2 Adjusted R-Squared
+
+```{r}
+histogram_viz(train_1, 
+              variable = 'Reg5_ARS',
+              time = 'From 2016 to 2018', 
+              binwdith = 0.025)
+```
+# Period 2
+
+
+Extract data for period 2
+
+```{r}
+sample_2 <- full_data %>% 
+  filter(year(date) %in% c(2019, 2020, 2021))
+```
+
+
+### 1. Model's Execution
+
+```{r}
+train_2 <- model_execution(sample_2)
+```
+
+### 2. Statistical Summary
+
+```{r}
+train_2 %>% 
+  statistic_summary()
+```
+
+### 3. Visualization
+
+3.1 Coefficient viz
+
+```{r}
+density_viz(train_2, 'From 2019 to 2021')
+```
+3.2 Adjusted R squared
+
+```{r}
+histogram_viz(train_2, 
+              variable = 'Reg5_ARS',
+              time = 'From 2019 to 2021', 
+              binwdith = 0.025)
+```
