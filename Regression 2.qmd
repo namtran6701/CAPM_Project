@@ -161,8 +161,12 @@ train_1 <- model_execution(sample_1)
 ### 2. Statistical Summary
 
 ```{r}
-train_1 %>% 
+train1_summary <- train_1 %>% 
   statistic_summary()
+
+# 
+# train1_summary %>% 
+#   write.csv('period1_model_2.csv')
 ```
 
 ### 3. Visualization
@@ -202,8 +206,11 @@ train_2 <- model_execution(sample_2)
 ### 2. Statistical Summary
 
 ```{r}
-train_2 %>% 
+train2_summary <- train_2 %>% 
   statistic_summary()
+
+# train2_summary %>% 
+#   write.csv('period2_model_2.csv')
 ```
 
 ### 3. Visualization

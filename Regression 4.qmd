@@ -5,7 +5,6 @@ format: docx
 editor: visual
 ---
 
-
 Packages used
 
 ```{r}
@@ -16,7 +15,6 @@ pacman::p_load(tidyverse,
                broom)
 options(scipen = 999)
 ```
-
 
 # Data Preparation
 
@@ -30,7 +28,7 @@ full_data %<>%
          )
 ```
 
-Create an adjusted market premium column 
+Create an adjusted market premium column
 
 ```{r}
 
@@ -156,11 +154,14 @@ train_1 <- model_execution(sample_1)
 
 train_1_summary <- statistic_summary(train_1)
 
+# train_1_summary %>% 
+#   write.csv('period1_model_4.csv')
 ```
 
 ### 3. Visualization
 
 3.1 Coefficient
+
 ```{r}
 histogram_viz(train_1, 
               variable = 'Reg4_B1',
@@ -168,12 +169,15 @@ histogram_viz(train_1,
 ```
 
 3.2 Adjusted R squared
+
 ```{r}
 histogram_viz(train_1, variable = 'Reg4_ARS', 
               binwdith = 0.015,
               time = 'from 2016 to 2018')
 ```
+
 # Period 2
+
 Change the sub sample dataset
 
 ```{r}
@@ -195,6 +199,9 @@ train_2 <- model_execution(sample_2)
 
 ```{r}
 train_2_summary <- statistic_summary(train_2)
+
+# train_2_summary %>% 
+#   write.csv('period2_model_4.csv')
 ```
 
 ### 3. Visualization
@@ -210,6 +217,3 @@ histogram_viz(train_2, 'Reg4_ARS',
               binwdith = 0.015,
               'From 2019 to 2021')
 ```
-
-
-

@@ -5,7 +5,6 @@ format: docx
 editor: visual
 ---
 
-
 Packages used
 
 ```{r}
@@ -29,7 +28,7 @@ full_data %<>%
          )
 ```
 
-1. Create an adjusted market premium column
+1.  Create an adjusted market premium column
 
 ```{r}
 
@@ -58,7 +57,7 @@ full_data %<>%
   mutate(Adj_Market_Ret_Prem = Adjusted_Market_Return - EFFR)
 ```
 
-2. Create adjusted sector premium column 
+2.  Create adjusted sector premium column
 
 ```{r}
 
@@ -95,7 +94,6 @@ full_data %<>%
   mutate(Adj_Sector_Ret_Prem = Adjusted_Sector_Return - EFFR)
 
 ```
-
 
 ## Function Customization
 
@@ -145,7 +143,6 @@ model_execution <- function(data){
 }
 
 ```
-
 
 ### 2. Statistical Summary
 
@@ -217,7 +214,7 @@ sample_1 <- full_data %>%
                    Adj_Sector_Ret_Prem)
 ```
 
-## Model 5: Excess Return ~ Adjusted Market Returns + Adjusted Sector Returns
+## Model 5: Excess Return \~ Adjusted Market Returns + Adjusted Sector Returns
 
 ### 1. Model's Execution
 
@@ -228,10 +225,13 @@ train_1 <- model_execution(sample_1)
 ### 2. Statistical Summary
 
 ```{r}
-train_1 %>% 
+train1_summary <- train_1 %>% 
   statistic_summary()
-```
 
+# train1_summary %>% 
+#   write.csv('period1_model_5.csv')
+
+```
 
 ### 3. Visualization
 
@@ -241,7 +241,6 @@ train_1 %>%
 density_viz(train_1, "From 2016 to 2018")
 ```
 
-
 3.2 Adjusted R-Squared
 
 ```{r}
@@ -250,8 +249,8 @@ histogram_viz(train_1,
               time = 'From 2016 to 2018', 
               binwdith = 0.025)
 ```
-# Period 2
 
+# Period 2
 
 Extract data for period 2
 
@@ -259,7 +258,6 @@ Extract data for period 2
 sample_2 <- full_data %>% 
   filter(year(date) %in% c(2019, 2020, 2021))
 ```
-
 
 ### 1. Model's Execution
 
@@ -270,8 +268,12 @@ train_2 <- model_execution(sample_2)
 ### 2. Statistical Summary
 
 ```{r}
-train_2 %>% 
+train2_summary <- train_2 %>% 
   statistic_summary()
+
+# train2_summary %>% 
+#   write.csv('period2_model_5.csv')
+
 ```
 
 ### 3. Visualization
@@ -281,6 +283,7 @@ train_2 %>%
 ```{r}
 density_viz(train_2, 'From 2019 to 2021')
 ```
+
 3.2 Adjusted R squared
 
 ```{r}

@@ -138,6 +138,8 @@ train_1 <- model_execution(sample_1)
 
 train_1_summary <- statistic_summary(train_1)
 
+# Export the result
+# train_1_summary %>% write.csv('period1_model_1.csv')
 ```
 
 ### 3. Visualization
@@ -176,6 +178,9 @@ validation_1 <- model_execution(sample_2)
 
 ```{r}
 valid_1_summary <- statistic_summary(validation_1)
+
+# Export Summary
+# valid_1_summary %>% write.csv('period2_model_1.csv')
 ```
 
 ### 3. Visualization
