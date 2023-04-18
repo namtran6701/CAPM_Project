@@ -123,12 +123,28 @@ histogram_viz <- function(input, variable, binwdith = 0.05, time){
 }
 ```
 
+### 4. Supplying Ticker
+
+```{r}
+sup_ticker <- function(dt){
+  perm_tick <- (sample_1 %>% 
+    select(PERMNO, TICKER) %>% 
+    unique())[c(1:357),]
+  new_data <- left_join(dt, perm_tick, by = 'PERMNO')
+  new_data %<>% 
+    select(PERMNO, TICKER, everything())
+  return(new_data)
+}
+
+```
+
 ## Model 1: Stock's Excess Return \~ Unadjusted Market Return
 
 ### 1. Model's Execution
 
 ```{r}
 train_1 <- model_execution(sample_1)
+
 
 ```
 
@@ -140,6 +156,8 @@ train_1_summary <- statistic_summary(train_1)
 
 # Export the result
 # train_1_summary %>% write.csv('period1_model_1.csv')
+
+
 ```
 
 ### 3. Visualization
@@ -156,12 +174,20 @@ histogram_viz(train_1, variable = 'Reg1_ARS',
               time = 'from 2016 to 2018')
 ```
 
+### 4. Extract data with PERMNO and Tickers
+
+-   Extract stocks that have beta less than 1.
+
+```{r}
+low_beta_1 <- sup_ticker(train_1) %>% 
+  filter(Reg1_B1<1)
+```
+
 # Period 2
 
 Change the sub sample dataset
 
 ```{r}
-
 sample_2 <- full_data %>% 
   filter(year(date) %in% c(2019, 2020, 2021))
 ```
@@ -195,4 +221,23 @@ histogram_viz(validation_1,
 histogram_viz(validation_1, 'Reg1_ARS', 
               binwdith = 0.015,
               'From 2019 to 2021')
+```
+
+### 4. Extract stocks with Tickers
+
+```{r}
+low_beta_2 <- sup_ticker(validation_1) %>% 
+  filter(Reg1_B1<1)
+```
+
+List of stocks whose beta are low consistently
+
+```{r}
+
+left_join(low_beta_2, low_beta_1, by = 'TICKER') %>% 
+  select(c(1,2,3,7)) %>% 
+  na.omit() %>% 
+  rename(Beta_Period_2 = Reg1_B1.x,
+         Beta_Period_1 = Reg1_B1.y,
+         PERMNO = PERMNO.x) %>% write.csv('low_beta_stock.csv')
 ```
