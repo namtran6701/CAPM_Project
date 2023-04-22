@@ -1,4 +1,5 @@
 ---
+`---
 title: "Regression 1"
 author: "Nam Tran"
 format: docx
@@ -138,6 +139,70 @@ sup_ticker <- function(dt){
 
 ```
 
+### 5. Portfolio Beta sorting
+
+-   Sort Beta based on quantile
+
+```{r}
+sort_beta <- function(sample_output){
+  sample_output$Beta_Type <- cut(sample_output$Reg1_B1, 
+    quantile(sample_output$Reg1_B1, 
+             probs = c(0, 0.25,0.5, 0.75, 1)),
+    labels = c('Low',
+               'mid_low',
+               'mid_high',
+               'high'
+               ),
+    include.lowest = T)
+  
+  return(sample_output)
+}
+```
+
+-   Summarize sorted beta
+
+```{r}
+sorted_beta_summary <- function(sample_output){
+  summary_output <- sort_beta(sample_output) %>% 
+  select(Reg1_B1, Beta_Type) %>% 
+  group_by(Beta_Type) %>% 
+  summarize(Min = min(Reg1_B1),
+            Mean = mean(Reg1_B1),
+            Median = median(Reg1_B1),
+            Max = max(Reg1_B1)) %>% 
+  mutate_if(is.numeric, round, digits = 4)
+  
+  return(summary_output)
+}
+
+```
+
+-   Average Excess return for grouped betas
+
+```{r}
+avg_ret_beta_sorted <- function(sample_output, period_data ){
+  sample_output$Beta_Type <- cut(sample_output$Reg1_B1, 
+    quantile(sample_output$Reg1_B1, 
+             probs = c(0, 0.25,0.5, 0.75, 1)),
+    labels = c('Low',
+               'mid_low',
+               'mid_high',
+               'high'
+               ),
+    include.lowest = T)
+
+# Calculate the average excess return for each stock in the sample and group with 
+  
+  avg_ex_ret <- period_data %>% 
+    group_by(PERMNO) %>% 
+    summarize('AVG_EX_RET' = mean(excess_ret)) %>% 
+    full_join(sample_output, by = 'PERMNO') %>% 
+    group_by(Beta_Type) %>% 
+    summarize('AVG_EX_RET' = mean(AVG_EX_RET))
+  return(avg_ex_ret)
+}
+```
+
 ## Model 1: Stock's Excess Return \~ Unadjusted Market Return
 
 ### 1. Model's Execution
@@ -157,6 +222,10 @@ train_1_summary <- statistic_summary(train_1)
 # Export the result
 # train_1_summary %>% write.csv('period1_model_1.csv')
 
+# Export the variable's output
+
+# train_1 %>% 
+#   write.csv('Reg1_old_restricted.csv')
 
 ```
 
@@ -176,11 +245,18 @@ histogram_viz(train_1, variable = 'Reg1_ARS',
 
 ### 4. Extract data with PERMNO and Tickers
 
--   Extract stocks that have beta less than 1.
+```{r}
+train_1 %<>% 
+  sup_ticker()
+```
+
+### 5. Portfolio Sorting based on Betas
 
 ```{r}
-low_beta_1 <- sup_ticker(train_1) %>% 
-  filter(Reg1_B1<1)
+
+avg_ex_ret_beta_1 <- avg_ret_beta_sorted(train_1, sample_1)
+
+summary_beta_output_1 <- sorted_beta_summary(train_1)
 ```
 
 # Period 2
@@ -207,6 +283,11 @@ valid_1_summary <- statistic_summary(validation_1)
 
 # Export Summary
 # valid_1_summary %>% write.csv('period2_model_1.csv')
+
+# Export variable's outputs
+# 
+# validation_1 %>% 
+#   write.csv('Reg1_new_restricted.csv')
 ```
 
 ### 3. Visualization
@@ -230,14 +311,16 @@ low_beta_2 <- sup_ticker(validation_1) %>%
   filter(Reg1_B1<1)
 ```
 
-List of stocks whose beta are low consistently
+### 5. Porfolio Sorting based on beta
+
+```{r}
+avg_ex_ret_beta_2 <- avg_ret_beta_sorted(validation_1, sample_2)
+
+
+summary_beta_output_2 <- sorted_beta_summary(validation_1)
+
+```
 
 ```{r}
 
-left_join(low_beta_2, low_beta_1, by = 'TICKER') %>% 
-  select(c(1,2,3,7)) %>% 
-  na.omit() %>% 
-  rename(Beta_Period_2 = Reg1_B1.x,
-         Beta_Period_1 = Reg1_B1.y,
-         PERMNO = PERMNO.x) %>% write.csv('low_beta_stock.csv')
 ```

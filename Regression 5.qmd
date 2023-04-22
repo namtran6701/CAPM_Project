@@ -230,7 +230,9 @@ train1_summary <- train_1 %>%
 
 # train1_summary %>% 
 #   write.csv('period1_model_5.csv')
-
+# 
+# train_1 %>% 
+#   write.csv('Reg5_old_restricted.csv')
 ```
 
 ### 3. Visualization
@@ -274,6 +276,9 @@ train2_summary <- train_2 %>%
 # train2_summary %>% 
 #   write.csv('period2_model_5.csv')
 
+# 
+# train_2 %>% 
+#   write.csv('Reg5_new_resticted.csv')
 ```
 
 ### 3. Visualization
